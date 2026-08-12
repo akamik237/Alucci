@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+.env
+.env.*
+
+public/heroes/_ref-egerie-promotrice.png
+public/heroes/*.archive.png
+tsconfig.tsbuildinfo
+.vercel
