@@ -18,7 +18,9 @@ export function LanguageSelect({ lang, playerName, onLang, onName, onStart, play
       <Embers count={6} />
       <div className="panel-matte fade-up relative z-10 w-full max-w-xl rounded-lg p-8 text-center md:p-10 lg:max-w-2xl">
         <p className="text-[11px] uppercase tracking-[0.28em] text-[var(--mist)]">
-          ALUCI · Édition cinématique
+          {fr
+            ? 'ALUCI · Gardien des coutumes et traditions'
+            : 'ALUCI · Guardian of customs and traditions'}
         </p>
         <h1 className="font-display font-display-lg mt-4 text-3xl text-[var(--bronze)] md:text-4xl lg:text-5xl">
           {fr ? 'Bienvenue, Gardien' : 'Welcome, Guardian'}

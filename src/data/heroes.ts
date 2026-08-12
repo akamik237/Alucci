@@ -306,6 +306,7 @@ export const introFilm = [
     trans: 'Le fardeau sacré de la terre et de la mémoire repose sur tes épaules désormais...',
     transEn: 'The sacred burden of land and memory now rests on your shoulders...',
     visual: 'from-stone-900 via-slate-950 to-emerald-950',
+    still: '/intro/acte1.png',
   },
   {
     act: "ACTE II : L'INSURRECTION DES 10 CLANS",
@@ -318,6 +319,7 @@ export const introFilm = [
     trans: 'Le guide ne plie pas le genou face à l’orage, il devient l’orage.',
     transEn: 'The guide does not kneel before the storm — he becomes the storm.',
     visual: 'from-red-950/80 via-slate-950 to-stone-950',
+    still: '/intro/acte2.png',
   },
   {
     act: 'ACTE III : TON AVENTURE COMMENCE',
@@ -330,5 +332,34 @@ export const introFilm = [
     trans: 'Les ancêtres ouvrent la voie. Avance sans trembler.',
     transEn: 'The ancestors open the path. Walk without trembling.',
     visual: 'from-amber-950/70 via-slate-950 to-emerald-950',
+    still: '/intro/acte3.png',
+  },
+]
+
+export type EnemyArchetype = {
+  id: string
+  name: string
+  nameEn: string
+  hpMax: number
+  attack: number
+  image: string
+}
+
+export const enemies: EnemyArchetype[] = [
+  {
+    id: 'patrouilleur',
+    name: 'Patrouilleur Colonial',
+    nameEn: 'Colonial Patrol',
+    hpMax: 85,
+    attack: 12,
+    image: '/enemies/patrouilleur.png',
+  },
+  {
+    id: 'milicien',
+    name: 'Milicien de Ligne',
+    nameEn: 'Line Militiaman',
+    hpMax: 105,
+    attack: 15,
+    image: '/enemies/milicien.png',
   },
 ]

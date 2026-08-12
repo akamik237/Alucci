@@ -1,4 +1,4 @@
-# ALUCI — Master Edition v6 (Cinematic)
+# ALUCI — Gardien des coutumes et traditions
 
 React + Vite + Tailwind. Flow: **langue → mini-film (3 actes) → hero_select → monde ouvert**.
 

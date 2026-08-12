@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import type { Hero } from '../data/heroes'
+import type { EnemyArchetype, Hero } from '../data/heroes'
+import { HeroArt } from './HeroArt'
 import { TopBar } from './TopBar'
 
 type Shared = {
@@ -8,6 +9,19 @@ type Shared = {
   onLang: (lang: 'FR' | 'EN') => void
   onMute: () => void
   onBack: () => void
+}
+
+const decorClass: Record<string, string> = {
+  savane: 'terrain-savane',
+  foret: 'terrain-forest',
+  'foret-dense': 'terrain-forest',
+  'foret-sud': 'terrain-forest',
+  forge: 'terrain-forge',
+  estuaire: 'terrain-littoral',
+  sahel: 'terrain-sahel',
+  grassfields: 'terrain-grassfields',
+  chefferie: 'terrain-chefferie',
+  volcan: 'terrain-volcan',
 }
 
 export function MissionsScreen({
@@ -33,12 +47,12 @@ export function MissionsScreen({
   const fr = lang === 'FR'
   return (
     <Shell lang={lang} muted={muted} onLang={onLang} onMute={onMute} onBack={onBack} title={fr ? 'Quêtes régionales' : 'Regional quests'}>
-      <p className="text-xs text-amber-200/60">
+      <p className="text-xs text-[var(--mist)]">
         {fr ? 'Ligne active' : 'Active line'}: {fr ? hero.name : hero.nameEn}
       </p>
       <h3 className="mt-2 font-display text-lg text-[var(--bronze)]">{hero.quest.title}</h3>
-      <p className="mt-2 text-sm text-amber-50/80">{hero.quest.desc}</p>
-      <p className="mt-2 text-xs text-amber-400/70">{hero.quest.hint}</p>
+      <p className="mt-2 text-sm text-[var(--ivory)]/80">{hero.quest.desc}</p>
+      <p className="mt-2 text-xs text-[var(--bronze)]/80">{hero.quest.hint}</p>
       {completed ? (
         <p className="mt-4 rounded-lg border border-emerald-500/40 bg-emerald-950/40 p-3 text-sm text-emerald-300">
           ✓ {fr ? 'Opération historique résolue ! (+150 XP)' : 'Historical operation solved! (+150 XP)'}
@@ -49,7 +63,7 @@ export function MissionsScreen({
             value={answer}
             onChange={(e) => onAnswer(e.target.value)}
             placeholder={fr ? 'Réponse historique...' : 'Historical answer...'}
-            className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-xs outline-none focus:border-amber-500"
+            className="panel-matte w-full rounded-md px-3 py-2 font-mono text-xs outline-none focus:border-[var(--bronze)]"
           />
           {status === 'error' && (
             <p className="text-xs text-red-400">
@@ -86,7 +100,7 @@ export function BoutiqueScreen({
   const fr = lang === 'FR'
   return (
     <Shell lang={lang} muted={muted} onLang={onLang} onMute={onMute} onBack={onBack} title={fr ? 'Marché & Forges' : 'Market & Forges'}>
-      <p className="mb-3 font-mono text-xs text-amber-300">{coupons} coupons</p>
+      <p className="mb-3 font-mono text-xs text-[var(--bronze)]">{coupons} coupons</p>
       <div className="grid gap-3 md:grid-cols-2">
         {items.map((item) => (
           <div key={item.id} className="panel-matte rounded-md p-4">
@@ -116,7 +130,7 @@ export function AlbumScreen({ lang, muted, onLang, onMute, onBack }: Shared) {
   ]
   return (
     <Shell lang={lang} muted={muted} onLang={onLang} onMute={onMute} onBack={onBack} title={fr ? 'Autel de lignée' : 'Lineage altar'}>
-      <p className="mb-3 text-xs text-amber-100/60">
+      <p className="mb-3 text-xs text-[var(--mist)]">
         {fr
           ? 'Portraits et fiches généalogiques d’Aluci (Archives Cameroun 1900–1916).'
           : 'Portraits and genealogy sheets of Aluci (Cameroon archives 1900–1916).'}
@@ -153,7 +167,7 @@ export function CombatScreen({
   hero: Hero
   playerHp: number
   enemyHp: number
-  enemy: { name: string; hpMax: number; attack: number; icon: string }
+  enemy: EnemyArchetype
   rage: number
   log: string[]
   flash: string | null
@@ -162,37 +176,92 @@ export function CombatScreen({
 }) {
   const fr = lang === 'FR'
   const done = playerHp <= 0 || enemyHp <= 0
-  return (
-    <div
-      className={`screen-shell transition ${
-        flash === 'player' ? 'bg-red-950/40' : flash === 'enemy' ? 'bg-white/5' : ''
-      }`}
-    >
-      <TopBar lang={lang} muted={muted} onLang={onLang} onMute={onMute} onBack={onBack} />
-      <h2 className="font-display text-lg text-[var(--bronze)]">{fr ? 'Ligne de front' : 'Front line'}</h2>
-      <p className="text-xs text-amber-100/60">{fr ? hero.name : hero.nameEn}</p>
+  const arena = decorClass[hero.decor] ?? 'terrain-forest'
 
-      <div className="mt-4 space-y-3">
-        <Bar label={`PV ${playerHp}/100 · Rage ${rage}%`} pct={playerHp} color="bg-emerald-500" />
-        <p className="text-sm">
-          {enemy.icon} {enemy.name}
-        </p>
-        <Bar label={`PV ${enemyHp}/${enemy.hpMax}`} pct={(enemyHp / enemy.hpMax) * 100} color="bg-red-500" />
+  return (
+    <div className="screen-shell">
+      <TopBar lang={lang} muted={muted} onLang={onLang} onMute={onMute} onBack={onBack} />
+      <h2 className="font-display text-2xl text-[var(--bronze)] md:text-3xl">
+        {fr ? 'Ligne de front' : 'Front line'}
+      </h2>
+      <p className="mt-1 text-xs text-[var(--mist)]">
+        {fr ? hero.name : hero.nameEn} · {fr ? enemy.name : enemy.nameEn}
+      </p>
+
+      <div
+        className={`combat-arena ${arena} mt-5 ${
+          flash === 'player' ? 'hit-player' : flash === 'enemy' ? 'hit-enemy' : ''
+        }`}
+      >
+        <div className="map-vignette" />
+        <div className="relative z-10 grid gap-4 p-4 md:grid-cols-2 md:gap-8 md:p-6">
+          <div className="flex flex-col items-center">
+            <div className="hero-card-frame w-full max-w-[220px] overflow-hidden rounded-md">
+              <HeroArt hero={hero} className="aspect-[3/4] w-full" showIcon={false} />
+            </div>
+            <p className="font-display mt-3 text-sm text-[var(--ivory)]">
+              {fr ? hero.name : hero.nameEn}
+            </p>
+            <div className="mt-2 w-full max-w-[220px]">
+              <div className="mb-1 flex justify-between text-[10px] text-[var(--mist)]">
+                <span>PV {playerHp}/100</span>
+                <span>Rage {rage}%</span>
+              </div>
+              <div className="hp-track">
+                <div className="hp-fill-player" style={{ width: `${playerHp}%` }} />
+              </div>
+              <div className="rage-track mt-1.5">
+                <div className="rage-fill" style={{ width: `${rage}%` }} />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center">
+            <div className="hero-card-frame w-full max-w-[220px] overflow-hidden rounded-md">
+              <img
+                src={enemy.image}
+                alt={enemy.name}
+                className="aspect-[3/4] w-full object-cover"
+              />
+            </div>
+            <p className="font-display mt-3 text-sm text-[var(--ivory)]">
+              {fr ? enemy.name : enemy.nameEn}
+            </p>
+            <div className="mt-2 w-full max-w-[220px]">
+              <div className="mb-1 text-[10px] text-[var(--mist)]">
+                PV {enemyHp}/{enemy.hpMax}
+              </div>
+              <div className="hp-track">
+                <div
+                  className="hp-fill-enemy"
+                  style={{ width: `${(enemyHp / enemy.hpMax) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-5 flex flex-wrap gap-2">
         <Btn disabled={done} onClick={() => onAction('ATTACK')}>{fr ? 'Frapper' : 'Strike'}</Btn>
         <Btn disabled={done} onClick={() => onAction('EVADE')}>{fr ? 'Esquive' : 'Evade'}</Btn>
-        <Btn disabled={done || rage < 100} onClick={() => onAction('ULTIMATE')}>{fr ? 'Ultime' : 'Ultimate'}</Btn>
-        <Btn disabled={done} onClick={() => onAction('FLEE')} danger>{fr ? 'Fuir' : 'Flee'}</Btn>
+        <Btn disabled={done || rage < 100} onClick={() => onAction('ULTIMATE')}>
+          {fr ? 'Ultime' : 'Ultimate'}
+        </Btn>
+        <Btn disabled={done} onClick={() => onAction('FLEE')} danger>
+          {fr ? 'Fuir' : 'Flee'}
+        </Btn>
         {done && (
           <Btn onClick={onLeave}>{fr ? "Quitter l'engagement" : 'Leave engagement'}</Btn>
         )}
       </div>
 
-      <div className="mt-4 max-h-40 space-y-1 overflow-y-auto text-[11px] text-amber-100/70">
+      <div className="panel-matte mt-4 max-h-36 space-y-1 overflow-y-auto rounded-md p-3 text-[11px] text-[var(--mist)]">
+        {log.length === 0 && (
+          <p>{fr ? 'Le combat commence…' : 'Combat begins…'}</p>
+        )}
         {log.map((line, i) => (
-          <p key={`${i}-${line.slice(0, 12)}`} className={i === 0 ? 'font-bold text-amber-100' : ''}>
+          <p key={`${i}-${line.slice(0, 16)}`} className={i === 0 ? 'font-semibold text-[var(--ivory)]' : ''}>
             {line}
           </p>
         ))}
@@ -215,17 +284,6 @@ function Shell({
   )
 }
 
-function Bar({ label, pct, color }: { label: string; pct: number; color: string }) {
-  return (
-    <div>
-      <div className="mb-1 text-[11px] text-amber-100/70">{label}</div>
-      <div className="h-2 overflow-hidden rounded bg-slate-800">
-        <div className={`h-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
-      </div>
-    </div>
-  )
-}
-
 function Btn({
   children,
   onClick,
@@ -242,8 +300,8 @@ function Btn({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`rounded px-3 py-1.5 text-xs font-bold uppercase disabled:opacity-40 ${
-        danger ? 'bg-red-800 text-white' : 'btn-bronze'
+      className={`rounded-md px-4 py-2 text-xs font-bold uppercase disabled:opacity-40 ${
+        danger ? 'bg-red-900 text-[var(--ivory)]' : 'btn-bronze'
       }`}
     >
       {children}

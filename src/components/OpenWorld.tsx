@@ -5,6 +5,24 @@ import { Embers } from './Embers'
 import { HeroArt } from './HeroArt'
 import { TopBar } from './TopBar'
 
+type WorldNpc = {
+  id: string
+  name: string
+  x: number
+  y: number
+  token: string
+  message: string
+}
+
+type WorldItem = {
+  id: string
+  name: string
+  x: number
+  y: number
+  token: string
+  collected: boolean
+}
+
 type Props = {
   hero: Hero
   playerName: string
@@ -18,8 +36,8 @@ type Props = {
   cam: { x: number; y: number }
   isMoving: boolean
   npcMessage: { name: string; text: string } | null
-  worldItems: { id: string; name: string; x: number; y: number; icon: string; collected: boolean }[]
-  npcs: { id: string; name: string; x: number; y: number; icon: string }[]
+  worldItems: WorldItem[]
+  npcs: WorldNpc[]
   onLang: (lang: 'FR' | 'EN') => void
   onMute: () => void
   onBack: () => void
@@ -98,9 +116,8 @@ export function OpenWorld({
       </div>
 
       <div className="relative z-10 mt-5 grid gap-5 lg:grid-cols-[220px_1fr_200px]">
-        {/* Hero panel */}
         <aside className="panel-matte overflow-hidden rounded-md">
-          <HeroArt hero={hero} className="aspect-[4/5] w-full" />
+          <HeroArt hero={hero} className="aspect-[4/5] w-full" showIcon={false} />
           <div className="p-3">
             <p className="font-display text-sm text-[var(--bronze)]">
               {fr ? hero.name : hero.nameEn}
@@ -112,25 +129,26 @@ export function OpenWorld({
           </div>
         </aside>
 
-        {/* Map */}
         <div className="relative h-[280px] overflow-hidden rounded-md border border-[rgba(184,137,58,0.25)] bg-[var(--ink)] md:h-[420px] lg:h-[480px]">
           <div
             className={`absolute h-[600px] w-[900px] transition-transform duration-200 ease-out ${terrain}`}
             style={{ transform: `translate(${-cam.x}px, ${-cam.y}px)` }}
           >
-            <div className="absolute left-8 top-8 h-24 w-40 rounded-full bg-emerald-900/40 blur-sm" />
-            <div className="absolute left-[480px] top-[200px] h-32 w-48 rounded-full bg-[rgba(139,94,52,0.25)] blur-md" />
-            <div className="absolute left-[100px] top-[380px] h-20 w-56 rounded-full bg-cyan-900/25 blur-sm" />
+            <div className="landmark-chefferie" style={{ left: 480, top: 210 }} />
+            <div className="landmark-path" style={{ left: 120, top: 300, width: 280 }} />
+            <div className="landmark-path" style={{ left: 360, top: 180, width: 200 }} />
+            <div className="landmark-shore" style={{ left: 40, top: 420 }} />
 
             {worldItems.map(
               (item) =>
                 !item.collected && (
                   <div
                     key={item.id}
-                    className="absolute animate-bounce rounded border border-[var(--bronze)] bg-[var(--bark)]/90 px-1 py-0.5 text-xs"
+                    className="world-token"
                     style={{ left: item.x, top: item.y }}
+                    title={item.name}
                   >
-                    {item.icon}
+                    <img src={item.token} alt={item.name} />
                   </div>
                 ),
             )}
@@ -138,26 +156,24 @@ export function OpenWorld({
             {npcs.map((npc) => (
               <div
                 key={npc.id}
-                className="absolute flex h-6 w-6 items-center justify-center rounded-full border border-[var(--moss)] bg-[var(--bark)] text-xs"
+                className="world-token"
                 style={{ left: npc.x, top: npc.y }}
                 title={npc.name}
               >
-                {npc.icon}
+                <img src={npc.token} alt={npc.name} />
               </div>
             ))}
 
             <div
-              className={`absolute flex h-7 w-7 items-center justify-center rounded-full border border-[var(--ivory)] bg-[var(--bronze)] text-xs font-bold text-[var(--ink)] shadow-lg transition-transform ${
-                isMoving ? 'scale-110' : ''
-              }`}
+              className={`world-token player-token ${isMoving ? 'moving' : ''}`}
               style={{ left: playerPos.x, top: playerPos.y }}
             >
-              {hero.icon}
+              <img src={hero.image} alt={hero.name} />
             </div>
           </div>
+          <div className="map-vignette" />
         </div>
 
-        {/* Controls + inventory */}
         <aside className="flex flex-col gap-4">
           <div className="panel-matte rounded-md p-3">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--mist)]">

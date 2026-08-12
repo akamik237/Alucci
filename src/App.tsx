@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HeroSelect } from './components/HeroSelect'
 import { IntroMovie } from './components/IntroMovie'
 import { LanguageSelect } from './components/LanguageSelect'
@@ -9,7 +9,8 @@ import {
   CombatScreen,
   MissionsScreen,
 } from './components/SideScreens'
-import { heroes, introFilm } from './data/heroes'
+import { enemies, heroes, introFilm, type EnemyArchetype } from './data/heroes'
+import { playEnemySfx, playSfx, setAmbient } from './lib/audio'
 
 type Step =
   | 'language_select'
@@ -44,16 +45,16 @@ const npcs = [
     name: 'Ancien Um',
     x: 160,
     y: 140,
-    icon: '👴',
+    token: '/tokens/npc-elder.png',
     message:
-      'La brousse est vaste, mais la mémoire est éternelle. Explore le Nord ou le Littoral avec tes touches clavier !',
+      'La brousse est vaste, mais la mémoire est éternelle. Explore le Nord ou le Littoral avec tes touches clavier.',
   },
   {
     id: 'blacksmith',
     name: 'Forgeron Kamga',
     x: 550,
     y: 380,
-    icon: '🔨',
+    token: '/tokens/npc-blacksmith.png',
     message:
       'Récupère des coupons en écrasant les patrouilles coloniales pour forger mes lances foudroyantes.',
   },
@@ -62,8 +63,8 @@ const npcs = [
     name: 'Éclaireur Tako',
     x: 320,
     y: 460,
-    icon: '🏹',
-    message: 'Si ta santé faiblit sous l’assaut, utilise le bouton Fuir pour sauver tes coupons !',
+    token: '/tokens/npc-scout.png',
+    message: 'Si ta santé faiblit sous l’assaut, utilise le bouton Fuir pour sauver tes coupons.',
   },
 ]
 
@@ -80,7 +81,9 @@ export default function App() {
   const [lang, setLang] = useState<'FR' | 'EN'>(
     () => (localStorage.getItem('al_lang') as 'FR' | 'EN') || 'FR',
   )
-  const [step, setStep] = useState<Step>('language_select')
+  const [step, setStepRaw] = useState<Step>('language_select')
+  const [transitioning, setTransitioning] = useState(false)
+  const [ambush, setAmbush] = useState(false)
   const [playerName, setPlayerName] = useState(
     () => localStorage.getItem('al_name') || "GARDIEN D'ALUCI",
   )
@@ -98,12 +101,33 @@ export default function App() {
     readJson('al_quests_done', {}),
   )
   const [inventory, setInventory] = useState<string[]>(() =>
-    readJson('al_inventory', ["Potion d'Écorce Sacrée 🧪"]),
+    readJson('al_inventory', ["Potion d'Écorce Sacrée"]),
   )
   const [worldItems, setWorldItems] = useState([
-    { id: 'i1', name: 'Remède de Matomb 🍃', x: 150, y: 250, icon: '🍃', collected: false },
-    { id: 'i2', name: 'Amulette de Nyong 🧿', x: 600, y: 150, icon: '🧿', collected: false },
-    { id: 'i3', name: 'Racine de Babimbi 🪵', x: 400, y: 450, icon: '🪵', collected: false },
+    {
+      id: 'i1',
+      name: 'Remède de Matomb',
+      x: 150,
+      y: 250,
+      token: '/tokens/loot-herb.png',
+      collected: false,
+    },
+    {
+      id: 'i2',
+      name: 'Amulette de Nyong',
+      x: 600,
+      y: 150,
+      token: '/tokens/loot-amulet.png',
+      collected: false,
+    },
+    {
+      id: 'i3',
+      name: 'Racine de Babimbi',
+      x: 400,
+      y: 450,
+      token: '/tokens/loot-root.png',
+      collected: false,
+    },
   ])
   const [playerPos, setPlayerPos] = useState({ x: 200, y: 200 })
   const [isMoving, setIsMoving] = useState(false)
@@ -116,57 +140,41 @@ export default function App() {
   const [damageFlash, setDamageFlash] = useState<string | null>(null)
   const [playerHp, setPlayerHp] = useState(100)
   const [enemyHp, setEnemyHp] = useState(100)
-  const [enemyType, setEnemyType] = useState({
-    name: 'Milicien',
-    hpMax: 80,
-    attack: 12,
-    icon: '💂',
-  })
+  const [enemyType, setEnemyType] = useState<EnemyArchetype>(enemies[0])
   const [combatLog, setCombatLog] = useState<string[]>([])
   const [mysticShield, setMysticShield] = useState(false)
   const [rage, setRage] = useState(0)
   const [movieScene, setMovieScene] = useState(0)
   const [cinemaFade, setCinemaFade] = useState(true)
   const [equippedWeapon, setEquippedWeapon] = useState({ name: 'Lance Initiale', dmg: 15 })
+  const transitionTimer = useRef<number | null>(null)
 
   const currentHero = heroes[selectedHero] ?? heroes[0]
 
-  const playSound = useCallback(
-    (type: string) => {
-      if (muted) return
-      try {
-        const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-        if (!Ctx) return
-        const ctx = new Ctx()
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
-        osc.connect(gain)
-        gain.connect(ctx.destination)
-        if (type === 'click') {
-          osc.type = 'sine'
-          osc.frequency.setValueAtTime(440, ctx.currentTime)
-          gain.gain.setValueAtTime(0.05, ctx.currentTime)
-          osc.start()
-          osc.stop(ctx.currentTime + 0.08)
-        } else if (type === 'hit') {
-          osc.type = 'triangle'
-          osc.frequency.setValueAtTime(120, ctx.currentTime)
-          gain.gain.setValueAtTime(0.2, ctx.currentTime)
-          osc.start()
-          osc.stop(ctx.currentTime + 0.15)
-        } else if (type === 'victory') {
-          osc.type = 'sine'
-          osc.frequency.setValueAtTime(523, ctx.currentTime)
-          gain.gain.setValueAtTime(0.1, ctx.currentTime)
-          osc.start()
-          osc.stop(ctx.currentTime + 0.4)
-        }
-      } catch {
-        /* ignore audio errors */
-      }
-    },
-    [muted],
-  )
+  const setStep = useCallback((next: Step) => {
+    setTransitioning(true)
+    if (transitionTimer.current) window.clearTimeout(transitionTimer.current)
+    transitionTimer.current = window.setTimeout(() => {
+      setStepRaw(next)
+      setTransitioning(false)
+    }, 280)
+  }, [])
+
+  const playSound = useCallback((type: string): void => {
+    const allowed = [
+      'click',
+      'hit',
+      'victory',
+      'ambush',
+      'evade',
+      'ultimate',
+      'enemy-patrouilleur',
+      'enemy-milicien',
+    ] as const
+    if ((allowed as readonly string[]).includes(type)) {
+      playSfx(type as (typeof allowed)[number], muted)
+    }
+  }, [muted]) as (type: string) => void
 
   useEffect(() => {
     localStorage.setItem('al_lang', lang)
@@ -177,6 +185,12 @@ export default function App() {
     localStorage.setItem('al_name', playerName)
     localStorage.setItem('al_hero', String(selectedHero))
   }, [lang, xp, coupons, completedQuests, inventory, playerName, selectedHero])
+
+  useEffect(() => {
+    const shouldPlay =
+      step === 'open_world' || step === 'intro_movie' || step === 'hero_select'
+    setAmbient(shouldPlay, muted)
+  }, [step, muted])
 
   useEffect(() => {
     const respawn = setInterval(() => {
@@ -196,6 +210,26 @@ export default function App() {
     return () => clearInterval(respawn)
   }, [])
 
+  const beginCombat = useCallback(
+    (chosen: EnemyArchetype) => {
+      setAmbush(true)
+      setScreenShake(true)
+      playSfx('ambush', muted)
+      window.setTimeout(() => setScreenShake(false), 250)
+      window.setTimeout(() => {
+        setEnemyType(chosen)
+        setPlayerHp(100)
+        setEnemyHp(chosen.hpMax)
+        setRage(15)
+        setCombatLog([])
+        setMysticShield(false)
+        setAmbush(false)
+        setStep('combat')
+      }, 1100)
+    },
+    [muted, setStep],
+  )
+
   const nextMovieScene = () => {
     playSound('click')
     setCinemaFade(false)
@@ -211,6 +245,7 @@ export default function App() {
 
   const movePlayer = useCallback(
     (direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT') => {
+      if (ambush) return
       setIsMoving(true)
       window.setTimeout(() => setIsMoving(false), 80)
       const speed = 18
@@ -230,7 +265,7 @@ export default function App() {
           prev.map((item) => {
             if (item.collected) return item
             const dist = Math.hypot(nextX - item.x, nextY - item.y)
-            if (dist < 25) {
+            if (dist < 28) {
               setInventory((inv) => [...inv, item.name])
               playSound('victory')
               return { ...item, collected: true }
@@ -242,34 +277,22 @@ export default function App() {
         let near = false
         npcs.forEach((npc) => {
           const distance = Math.hypot(nextX - npc.x, nextY - npc.y)
-          if (distance < 25) {
+          if (distance < 28) {
             setActiveNpcMessage({ name: npc.name, text: npc.message })
             near = true
           }
         })
         if (!near) setActiveNpcMessage(null)
 
-        if (!near && Math.random() < 0.05) {
-          setScreenShake(true)
-          window.setTimeout(() => setScreenShake(false), 250)
-          const targets = [
-            { name: 'Patrouilleur Colonial', hpMax: 85, attack: 12, icon: '💂' },
-            { name: 'Milicien de Ligne', hpMax: 105, attack: 15, icon: '⚔️' },
-          ]
-          const chosen = targets[Math.floor(Math.random() * targets.length)]
-          setEnemyType(chosen)
-          setPlayerHp(100)
-          setEnemyHp(chosen.hpMax)
-          setRage(15)
-          setCombatLog([])
-          setMysticShield(false)
-          setStep('combat')
+        if (!near && Math.random() < 0.045) {
+          const chosen = enemies[Math.floor(Math.random() * enemies.length)]
+          beginCombat(chosen)
         }
 
         return { x: nextX, y: nextY }
       })
     },
-    [playSound],
+    [ambush, beginCombat, playSound],
   )
 
   useEffect(() => {
@@ -295,47 +318,47 @@ export default function App() {
         setStep('open_world')
         return
       }
-      logLines.push('❌ Échec ! La patrouille te bloque le passage !')
+      logLines.push('Fuite échouée — la patrouille bloque le passage.')
     }
 
     let nextEnemyHp = enemyHp
     let nextPlayerHp = playerHp
-    let nextRage = rage
     let shield = mysticShield
 
     if (actionType === 'ATTACK') {
       const dmg = Math.floor(Math.random() * 10) + equippedWeapon.dmg
       nextEnemyHp = Math.max(0, enemyHp - dmg)
-      nextRage = Math.min(100, rage + 20)
       setEnemyHp(nextEnemyHp)
-      setRage(nextRage)
+      setRage((r) => Math.min(100, r + 20))
       setDamageFlash('enemy')
-      window.setTimeout(() => setDamageFlash(null), 150)
-      logLines.push(`💥 Impact ! Tu infliges ${dmg} dégâts à la cible.`)
+      window.setTimeout(() => setDamageFlash(null), 180)
+      logLines.push(`Impact — ${dmg} dégâts.`)
       playSound('hit')
     } else if (actionType === 'EVADE') {
       shield = true
       setMysticShield(true)
-      logLines.push('🛡️ Posture défensive adoptée pour contrer la riposte.')
+      logLines.push('Posture défensive adoptée.')
+      playSound('evade')
     } else if (actionType === 'ULTIMATE' && rage >= 100) {
       const dmg = Math.floor(equippedWeapon.dmg * 2.5)
       nextEnemyHp = Math.max(0, enemyHp - dmg)
-      nextRage = 0
       setEnemyHp(nextEnemyHp)
       setRage(0)
       setDamageFlash('enemy')
-      window.setTimeout(() => setDamageFlash(null), 200)
-      logLines.push(`🔥 CRITIQUE MYSTIQUE : ${currentHero.special} inflige -${dmg} PV !`)
+      window.setTimeout(() => setDamageFlash(null), 220)
+      logLines.push(`${currentHero.special} — ${dmg} dégâts critiques.`)
+      playSound('ultimate')
     }
 
     if (nextEnemyHp <= 0) {
       setXp((x) => x + 50)
       setCoupons((c) => c + 40)
       setCombatLog((prev) => [
-        '🏆 Patrouille écrasée ! Progression sécurisée (+50 XP / +40 Coupons)',
+        'Patrouille écrasée (+50 XP / +40 Coupons)',
         ...logLines,
         ...prev,
       ])
+      playSound('victory')
       return
     }
 
@@ -344,19 +367,21 @@ export default function App() {
       if (shield) {
         enemyDmg = 0
         setMysticShield(false)
-        logLines.push("🛡️ Esquive parfaite ! L'assaut passe à côté.")
+        logLines.push('Esquive parfaite.')
+        playSound('evade')
       } else {
         nextPlayerHp = Math.max(0, playerHp - enemyDmg)
         setPlayerHp(nextPlayerHp)
         setDamageFlash('player')
-        window.setTimeout(() => setDamageFlash(null), 150)
-        logLines.push(`🥊 Le ${enemyType.name} contre-attaque : -${enemyDmg} PV.`)
+        window.setTimeout(() => setDamageFlash(null), 180)
+        logLines.push(`${enemyType.name} riposte — ${enemyDmg} PV.`)
+        playEnemySfx(enemyType.id, muted)
       }
     }
 
     if (nextPlayerHp <= 0) {
       setCoupons((c) => Math.max(0, c - 15))
-      logLines.push('💀 K.O. ! Ton clan te rapatrie en urgence à la chefferie.')
+      logLines.push('K.O. — ton clan te rapatrie à la chefferie.')
     }
 
     setCombatLog((prev) => [...logLines, ...prev])
@@ -377,7 +402,6 @@ export default function App() {
 
   const cam = useMemo(
     () => ({
-      // Wider desktop viewport: keep player nearer center of larger map window
       x: Math.min(Math.max(0, playerPos.x - 320), 420),
       y: Math.min(Math.max(0, playerPos.y - 180), 280),
     }),
@@ -386,10 +410,22 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-[100dvh] text-slate-100 transition-transform duration-200 ${
-        screenShake ? 'scale-[0.98]' : ''
+      className={`min-h-[100dvh] text-[var(--ivory)] transition-transform duration-200 ${
+        screenShake ? 'scale-[0.985]' : ''
       }`}
     >
+      <div className={`step-transition ${transitioning ? 'active' : ''}`} />
+
+      {ambush && (
+        <div className="ambush-overlay" aria-live="assertive">
+          <div />
+          <p className="ambush-title">
+            {lang === 'FR' ? 'PATROUILLE…' : 'PATROL…'}
+          </p>
+          <div />
+        </div>
+      )}
+
       {step === 'language_select' && (
         <LanguageSelect
           lang={lang}
@@ -528,7 +564,7 @@ export default function App() {
       )}
 
       <footer className="pointer-events-none fixed bottom-1 left-0 right-0 text-center text-[9px] tracking-[0.2em] text-[var(--mist)]/30">
-        ALUCI · v6 · 10 Gardiens
+        ALUCI · Gardien des coutumes et traditions · 10 Gardiens
       </footer>
     </div>
   )
